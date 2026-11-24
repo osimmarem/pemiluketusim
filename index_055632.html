@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>E-VOTE OSIM</title>
+<style>
+:root{--navy:#123F70;--blue:#1769AA;--sky:#63A9E8;--light:#D8ECFF;--ice:#EAF5FF;--txt:#18344F;--red:#b3261e;--ok:#1b7f4b}
+*{box-sizing:border-box}
+body{margin:0;font-family:"Segoe UI",system-ui,-apple-system,Roboto,sans-serif;background:var(--ice);color:var(--txt);line-height:1.5}
+h1,h2,h3{color:var(--navy);margin:0 0 .5rem;line-height:1.25}h1{font-size:1.5rem}h2{font-size:1.25rem}h3{font-size:1.05rem}
+.wrap{max-width:1100px;margin:0 auto;padding:1rem}.narrow{max-width:460px}
+.card{background:#fff;border-radius:16px;box-shadow:0 2px 10px rgba(18,63,112,.08);padding:1.25rem;margin-bottom:1rem}
+.brand{display:flex;align-items:center;gap:.75rem;margin-bottom:1rem}
+.brand img,.brand svg{width:48px;height:48px;object-fit:contain;flex:none}
+.brand b{display:block;color:var(--navy);font-size:1.15rem}.brand small{color:var(--blue)}
+.btn{display:block;width:100%;min-height:48px;padding:.6rem 1.1rem;border:0;border-radius:12px;background:var(--blue);color:#fff;font:inherit;font-weight:600;cursor:pointer;text-align:center}
+.btn:hover{background:var(--navy)}.btn:disabled{opacity:.6;cursor:wait}.btn.alt{background:var(--light);color:var(--navy)}.btn.alt:hover{background:var(--sky)}
+input{width:100%;min-height:48px;padding:.55rem .75rem;border:1px solid #b9d3ea;border-radius:10px;font:inherit;letter-spacing:.08em;text-transform:uppercase}
+label{display:block;font-weight:600;margin:.75rem 0 .25rem;font-size:.92rem}
+:focus-visible{outline:3px solid var(--sky);outline-offset:2px}
+.err{color:var(--red);min-height:1.4em;margin:.5rem 0}
+.grid{display:grid;gap:1rem;grid-template-columns:1fr}
+@media(min-width:768px){.grid.c3{grid-template-columns:repeat(2,1fr)}}
+@media(min-width:992px){.grid.c3{grid-template-columns:repeat(3,1fr)}}
+.cand{display:flex;flex-direction:column;margin:0}
+.ph{width:100%;aspect-ratio:4/3;border-radius:12px;background:var(--light);object-fit:cover;display:grid;place-items:center;color:var(--blue);font-size:3rem;font-weight:700}
+.no{display:inline-block;background:var(--navy);color:#fff;border-radius:999px;padding:.1rem .8rem;font-weight:700;margin:.6rem 0 .2rem}
+.cand p{white-space:pre-line;margin:.2rem 0 .6rem;font-size:.95rem}.cand .btn{margin-top:auto}
+.center{text-align:center}
+.ico{width:76px;height:76px;border-radius:50%;background:var(--ok);color:#fff;font-size:2.6rem;display:grid;place-items:center;margin:0 auto 1rem}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script type="module">
+import {initializeApp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import {getFirestore,doc,getDoc,getDocs,collection,writeBatch} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import {getAuth,signInAnonymously,signOut} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+
+const firebaseConfig={apiKey:"AIzaSyCy2ZIkIrHOkqGjZe8quPudJHtQVdBodpY",authDomain:"pemilihanketusim.firebaseapp.com",projectId:"pemilihanketusim",storageBucket:"pemilihanketusim.firebasestorage.app",messagingSenderId:"424672989010",appId:"1:424672989010:web:f8bc0f380a605e51a1f48b"};
+const fb=initializeApp(firebaseConfig),db=getFirestore(fb),auth=getAuth(fb);
+
+const $=s=>document.querySelector(s),app=$('#app'),S=sessionStorage;
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const H=async x=>{const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(x));return[...new Uint8Array(b)].map(v=>v.toString(16).padStart(2,'0')).join('')};
+const rid=()=>[...crypto.getRandomValues(new Uint8Array(16))].map(v=>v.toString(16).padStart(2,'0')).join('');
+const go=h=>{location.hash=h};
+const ICON='<svg viewBox="0 0 48 48" aria-hidden="true"><rect x="6" y="22" width="36" height="20" rx="4" fill="#1769AA"/><rect x="16" y="8" width="16" height="22" rx="2" fill="#fff" stroke="#123F70" stroke-width="2.5" transform="rotate(-8 24 19)"/><path d="M19 17l4 4 7-8" fill="none" stroke="#1769AA" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" transform="rotate(-8 24 19)"/><rect x="14" y="28" width="20" height="3" rx="1.5" fill="#D8ECFF"/></svg>';
+let B={};
+const brand=()=>`<div class="brand">${B.logo?`<img src="${esc(B.logo)}" alt="Logo">`:ICON}<div><b>${esc(B.portal||'E-VOTE OSIM')}</b><small>Digital Student Election${B.school?' · '+esc(B.school):''}</small></div></div>`;
+const foot=()=>B.footer?`<p class="center" style="color:var(--blue);font-size:.85rem">${esc(B.footer)}</p>`:'';
+const isOpen=e=>{if(!e||e.status!=='berlangsung')return false;const n=Date.now();return(!e.mulai||n>=e.mulai.toDate())&&(!e.selesai||n<=e.selesai.toDate())};
+const NET='Tidak dapat terhubung ke server. Periksa koneksi internet lalu coba lagi.';
+
+async function render(){
+  const r=(location.hash||'#/vote/access').slice(1);window.scrollTo(0,0);
+  try{const s=await getDoc(doc(db,'settings','branding'));B=s.exists()?s.data():{}}catch(e){B={}}
+  if((r==='/vote/candidates'||r==='/vote/confirmation')&&!S.th)return go('#/vote/access');
+  if(r==='/vote/confirmation'&&!S.pick)return go('#/vote/candidates');
+  if(r==='/vote/candidates')return vCand();
+  if(r==='/vote/confirmation')return vConf();
+  if(r==='/vote/success')return vOk();
+  vAccess();
+}
+window.addEventListener('hashchange',render);
+
+function vAccess(){
+  app.innerHTML=`<div class="wrap narrow">${brand()}<div class="card"><h1>Verifikasi Hak Pilih</h1>
+  <p>${esc(B.welcome||'Masukkan kode akses yang diberikan panitia untuk mulai memilih.')}</p>
+  <label for="pin">Kode akses</label><input id="pin" autocomplete="off" autocapitalize="characters" maxlength="20" placeholder="Masukkan kode">
+  <div class="err" id="e" role="alert"></div><button class="btn" id="b">Verifikasi</button></div>${foot()}</div>`;
+  const run=async()=>{
+    const e=$('#e'),p=$('#pin').value.trim().toUpperCase().replace(/\s/g,'');e.textContent='';
+    if(!p){e.textContent='Kode akses wajib diisi.';return}
+    $('#b').disabled=true;
+    try{
+      const h=await H(p);
+      await signOut(auth);await signInAnonymously(auth);          // UID baru untuk setiap pemilih
+      const t=await getDoc(doc(db,'tokens',h));
+      if(!t.exists())e.textContent='Kode tidak ditemukan. Periksa kembali kode Anda.';
+      else if(t.data().used)e.textContent='Kode ini sudah digunakan.';
+      else{
+        const el=await getDoc(doc(db,'elections','main'));
+        if(!isOpen(el.data()))e.textContent='Pemilihan belum dibuka atau sudah ditutup.';
+        else{S.th=h;S.pick='';go('#/vote/candidates');return}
+      }
+    }catch(x){e.textContent=NET}
+    $('#b').disabled=false;
+  };
+  $('#b').onclick=run;$('#pin').onkeydown=e=>{if(e.key==='Enter')run()};
+}
+
+async function vCand(){
+  app.innerHTML=`<div class="wrap">${brand()}<p>Memuat kandidat…</p></div>`;
+  let list=[];
+  try{list=(await getDocs(collection(db,'candidates'))).docs.map(d=>({id:d.id,...d.data()})).filter(c=>c.aktif!==false).sort((a,b)=>(a.urutan||0)-(b.urutan||0)||a.nomor-b.nomor)}
+  catch(e){app.innerHTML=`<div class="wrap">${brand()}<div class="card center">${NET}</div></div>`;return}
+  app.innerHTML=`<div class="wrap">${brand()}<h1>Kandidat Ketua dan Wakil Ketua OSIM</h1><p>Baca visi dan misi setiap pasangan calon, lalu pilih satu.</p>
+  ${list.length?`<div class="grid c3">${list.map(c=>`<div class="card cand">${c.foto?`<img class="ph" src="${esc(c.foto)}" alt="Foto pasangan calon nomor ${esc(c.nomor)}">`:`<div class="ph">${esc(c.nomor)}</div>`}
+  <div><span class="no">No. ${esc(c.nomor)}</span><h3>${esc(c.ketua)}</h3><h3 style="font-weight:500">${esc(c.wakil)}</h3></div>
+  <h3>Visi</h3><p>${esc(c.visi)}</p><h3>Misi</h3><p>${esc(c.misi)}</p><h3>Program kerja</h3><p>${esc(c.program)}</p>
+  <button class="btn" data-id="${esc(c.id)}">Pilih Kandidat Ini</button></div>`).join('')}</div>`:'<div class="card center">Belum ada kandidat yang tersedia.</div>'}${foot()}</div>`;
+  app.querySelectorAll('[data-id]').forEach(b=>b.onclick=()=>{S.pick=b.dataset.id;go('#/vote/confirmation')});
+}
+
+async function vConf(){
+  let c;
+  try{const d=await getDoc(doc(db,'candidates',S.pick));if(!d.exists())throw 0;c={id:d.id,...d.data()}}catch(e){S.pick='';return go('#/vote/candidates')}
+  app.innerHTML=`<div class="wrap narrow">${brand()}<div class="card center"><h1>Konfirmasi Pilihan Anda</h1>
+  ${c.foto?`<img class="ph" src="${esc(c.foto)}" alt="Foto kandidat terpilih">`:''}
+  <div class="no">No. ${esc(c.nomor)}</div><h2>${esc(c.ketua)}</h2><h3 style="font-weight:500">${esc(c.wakil)}</h3>
+  <p><b>Apakah Anda yakin dengan pilihan ini?</b></p><div class="err" id="e" role="alert"></div>
+  <div class="grid"><button class="btn" id="ok">Kirim Suara</button><button class="btn alt" id="bk">Kembali</button></div></div></div>`;
+  $('#bk').onclick=()=>go('#/vote/candidates');
+  let busy=false;
+  $('#ok').onclick=async()=>{
+    if(busy)return;busy=true;const b=$('#ok'),e=$('#e');e.textContent='';b.disabled=true;b.textContent='Mengirim…';$('#bk').disabled=true;
+    try{
+      const uid=auth.currentUser?.uid;if(!uid)throw new Error('sesi');
+      const bt=writeBatch(db);                                   // satu transaksi atomik
+      bt.set(doc(db,'claims',uid),{t:S.th});
+      bt.update(doc(db,'tokens',S.th),{used:true});
+      bt.set(doc(db,'ballots',rid()),{c:c.id});
+      await bt.commit();
+      S.clear();S.done='1';await signOut(auth);go('#/vote/success');return;
+    }catch(x){
+      // Koneksi putus saat commit: cek apakah token ternyata sudah terpakai
+      try{const t=await getDoc(doc(db,'tokens',S.th));if(t.exists()&&t.data().used){S.clear();S.done='1';await signOut(auth);go('#/vote/success');return}}catch(_){}
+      e.textContent='Suara belum terkirim. Periksa koneksi, lalu tekan "Kirim Suara" lagi. Jika terus gagal, hubungi panitia.';
+    }
+    busy=false;b.disabled=false;b.textContent='Kirim Suara';$('#bk').disabled=false;
+  };
+}
+
+function vOk(){
+  if(!S.done)return go('#/vote/access');
+  app.innerHTML=`<div class="wrap narrow">${brand()}<div class="card center"><div class="ico">✓</div><h1>Suara Berhasil Dikirim</h1><p>Terima kasih sudah berpartisipasi. Proses pemilihan Anda telah selesai.</p></div>${foot()}</div>`;
+}
+render();
+</script>
+</body>
+</html>
