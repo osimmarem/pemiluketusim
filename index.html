@@ -96,6 +96,8 @@ async function vCand(){
   let list=[];
   try{list=(await getDocs(collection(db,'candidates'))).docs.map(d=>({id:d.id,...d.data()})).filter(c=>c.aktif!==false).sort((a,b)=>(a.urutan||0)-(b.urutan||0)||a.nomor-b.nomor)}
   catch(e){app.innerHTML=`<div class="wrap">${brand()}<div class="card center">${NET}</div></div>`;return}
+  let op=false;try{op=isOpen((await getDoc(doc(db,'elections','main'))).data())}catch(e){}
+  if(!op){app.innerHTML=`<div class="wrap narrow">${brand()}<div class="card center"><h1>Pemilihan Belum Dibuka</h1><p>Pemilihan belum dibuka atau sudah ditutup. Silakan hubungi panitia.</p><button class="btn" id="bk">Kembali ke Halaman Awal</button></div></div>`;$('#bk').onclick=()=>{S.clear();go('#/vote/access')};return}
   app.innerHTML=`<div class="wrap">${brand()}<h1>Kandidat Ketua dan Wakil Ketua OSIM</h1><p>Baca visi dan misi setiap pasangan calon, lalu pilih satu.</p>
   ${list.length?`<div class="grid c3">${list.map(c=>`<div class="card cand">${c.foto?`<img class="ph" src="${esc(c.foto)}" alt="Foto pasangan calon nomor ${esc(c.nomor)}">`:`<div class="ph">${esc(c.nomor)}</div>`}
   <div><span class="no">No. ${esc(c.nomor)}</span><h3>${esc(c.ketua)}</h3><h3 style="font-weight:500">${esc(c.wakil)}</h3></div>
@@ -130,7 +132,8 @@ async function vConf(){
       // Koneksi putus saat commit: cek apakah token ternyata sudah terpakai
       try{const t=await getDoc(doc(db,'tokens',S.th));if(t.exists()&&t.data().used){S.clear();S.done='1';await signOut(auth);go('#/vote/success');return}}catch(_){}
       console.error(x);
-      e.textContent='Suara belum terkirim ('+(x.code||x.message||'error')+'). Periksa koneksi, lalu tekan "Kirim Suara" lagi. Jika terus gagal, hubungi panitia.';
+      let op=true;try{op=isOpen((await getDoc(doc(db,'elections','main'))).data())}catch(_){}
+      e.textContent=op?'Suara belum terkirim ('+(x.code||x.message||'error')+'). Periksa koneksi, lalu tekan "Kirim Suara" lagi. Jika terus gagal, hubungi panitia.':'Pemilihan belum dibuka atau sudah ditutup, jadi suara tidak dapat dikirim. Silakan hubungi panitia.';
     }
     busy=false;b.disabled=false;b.textContent='Kirim Suara';$('#bk').disabled=false;
   };
@@ -138,7 +141,10 @@ async function vConf(){
 
 function vOk(){
   if(!S.done)return go('#/vote/access');
-  app.innerHTML=`<div class="wrap narrow">${brand()}<div class="card center"><div class="ico">✓</div><h1>Suara Berhasil Dikirim</h1><p>Terima kasih sudah berpartisipasi. Proses pemilihan Anda telah selesai.</p></div>${foot()}</div>`;
+  app.innerHTML=`<div class="wrap narrow">${brand()}<div class="card center"><div class="ico">✓</div><h1>Suara Berhasil Dikirim</h1><p>Terima kasih sudah berpartisipasi. Proses pemilihan Anda telah selesai.</p><button class="btn" id="fin">Selesai</button><p style="font-size:.85rem;color:var(--blue)">Halaman akan kembali otomatis dalam beberapa detik.</p></div>${foot()}</div>`;
+  const back=()=>{S.clear();go('#/vote/access')};
+  $('#fin').onclick=back;
+  setTimeout(()=>{if((location.hash||'').startsWith('#/vote/success'))back()},12000);
 }
 render();
 </script>
