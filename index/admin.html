@@ -78,7 +78,7 @@ onAuthStateChanged(auth,async u=>{
     const a=await getDoc(doc(db,'admins',u.uid));
     if(!a.exists()){await signOut(auth);return loginView('Akun ini bukan admin.')}
     const e=await getDoc(doc(db,'elections','main'));
-    if(!e.exists()){await setDoc(doc(db,'elections','main'),{nama:'Pemilihan Ketua dan Wakil Ketua OSIM',periode:'',status:'draft',mulai:null,selesai:null})}
+    if(!e.exists()){await setDoc(doc(db,'elections','main'),{nama:'Pemilihan Ketua dan Wakil Ketua OSIM',periode:'',status:'draft',mulai:null,selesai:null,demo:true})}
     log('Login admin');shell();
   }catch(x){console.error(x);await signOut(auth);loginView('Gagal memuat akun. Kode error: '+(x.code||x.message||x))}
 });
@@ -123,6 +123,7 @@ async function pBrand(m){
 
 /* ---------- Data pemilih & token ---------- */
 async function pStud(m){
+  const demo=E.demo!==false;
   const [sd,td]=await Promise.all([getDocs(collection(db,'students')),getDocs(collection(db,'tokens'))]);
   const S=sd.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>String(a.no).localeCompare(String(b.no),'id',{numeric:true}));
   const T={};td.docs.forEach(d=>T[d.data().sid]={id:d.id,used:d.data().used});
@@ -144,8 +145,9 @@ async function pStud(m){
   const draw=()=>{
     const t=$('#q').value.toLowerCase(),k=$('#fk').value;
     $('#tb').innerHTML=S.filter(s=>(!k||s.k===k)&&(s.n+s.no).toLowerCase().includes(t)).map(s=>{const tk=T[s.id];return`<tr><td>${esc(s.no)}</td><td>${esc(s.n)}</td><td>${esc(s.k)}</td><td>${s.on!==false?'Berhak':'Nonaktif'}</td><td>${tk?(tk.used?'<span class="tag ok">Sudah memilih</span>':'<span class="tag">Token terbit</span>'):'—'}</td>
-    <td class="row">${tk?(tk.used?'':`<button class="btn sm" data-r="${s.id}">Token baru</button>`):`<button class="btn sm" data-t="${s.id}">Terbitkan token</button>`}<button class="btn sm alt" data-x="${s.id}">${s.on!==false?'Nonaktifkan':'Aktifkan'}</button></td></tr>`}).join('')||'<tr><td colspan="6">Belum ada data pemilih.</td></tr>';
+    <td class="row">${tk?(tk.used?'':`<button class="btn sm" data-r="${s.id}">Token baru</button>`):`<button class="btn sm" data-t="${s.id}">Terbitkan token</button>`}<button class="btn sm alt" data-x="${s.id}">${s.on!==false?'Nonaktifkan':'Aktifkan'}</button>${(demo||!tk)?`<button class="btn sm red" data-h="${s.id}">Hapus</button>`:''}</td></tr>`}).join('')||'<tr><td colspan="6">Belum ada data pemilih.</td></tr>';
     $('#tb').querySelectorAll('[data-t]').forEach(b=>b.onclick=()=>issue([b.dataset.t]));
+    $('#tb').querySelectorAll('[data-h]').forEach(b=>b.onclick=guard(async()=>{const s=S.find(x=>x.id===b.dataset.h);if(!confirm('Hapus siswa "'+s.n+'"?'))return;if(T[s.id])await deleteDoc(doc(db,'tokens',T[s.id].id));await deleteDoc(doc(db,'students',s.id));await log('Hapus pemilih');shell()}));
     $('#tb').querySelectorAll('[data-r]').forEach(b=>b.onclick=guard(async()=>{if(!confirm('Ganti token siswa ini? Token lama tidak berlaku.'))return;await deleteDoc(doc(db,'tokens',T[b.dataset.r].id));delete T[b.dataset.r];await issue([b.dataset.r])}));
     $('#tb').querySelectorAll('[data-x]').forEach(b=>b.onclick=guard(async()=>{const s=S.find(x=>x.id===b.dataset.x);await updateDoc(doc(db,'students',s.id),{on:s.on===false});await log('Ubah status pemilih');shell()}));
   };
@@ -159,29 +161,56 @@ async function pStud(m){
 
 /* ---------- Kandidat ---------- */
 async function pCand(m){
-  const lock=['berlangsung','selesai'].includes(E.status);
+  const demo=E.demo!==false,started=['berlangsung','selesai'].includes(E.status),lock=started&&!demo;
   const C=(await getDocs(collection(db,'candidates'))).docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(a.urutan||0)-(b.urutan||0));
-  m.innerHTML=`<h1>Kandidat</h1>${lock?'<div class="msg">Data kandidat terkunci karena pemilihan sudah dimulai.</div>':`<div class="card"><h2>Tambah kandidat</h2><div class="grid c2"><div><label>Nomor urut</label><input id="nr" type="number" min="1"></div><div><label>Urutan tampil</label><input id="od" type="number"></div><div><label>Nama calon ketua</label><input id="kt"></div><div><label>Nama calon wakil</label><input id="wk"></div></div>
-  <label>Foto pasangan</label><input type="file" id="ph" accept="image/*"><img id="pp" alt="" style="max-height:120px;margin-top:.5rem;border-radius:10px"><label>Visi</label><textarea id="vs"></textarea><label>Misi</label><textarea id="ms"></textarea><label>Program kerja</label><textarea id="pg"></textarea><button class="btn" id="sv" style="margin-top:1rem">Simpan kandidat</button></div>`}
-  <div class="grid c2">${C.map(c=>`<div class="card" style="margin:0">${c.foto?`<img src="${esc(c.foto)}" alt="" style="width:100%;max-height:160px;object-fit:cover;border-radius:10px">`:''}<h2>No. ${esc(c.nomor)} — ${esc(c.ketua)} &amp; ${esc(c.wakil)}</h2><p><b>Visi:</b> ${esc(c.visi)}</p>${lock?'':`<button class="btn red sm" data-d="${c.id}">Hapus</button>`}</div>`).join('')||'<div class="card">Belum ada kandidat yang tersedia.</div>'}</div>`;
-  if(lock)return;let foto='';
-  $('#ph').onchange=guard(async e=>{const f=e.target.files[0];if(!f)return;if(!/^image\/(png|jpeg|webp)$/.test(f.type)||f.size>5e6)return alert('Foto harus PNG/JPG/WEBP maksimal 5 MB.');foto=await img2url(f,640,'image/jpeg',.72);$('#pp').src=foto});
-  $('#sv').onclick=guard(async()=>{const g=i=>$('#'+i).value.trim(),nomor=+g('nr');if(!nomor||!g('kt')||!g('wk'))return alert('Nomor urut, nama ketua, dan nama wakil wajib diisi.');if(C.some(c=>c.nomor===nomor))return alert('Nomor urut sudah dipakai.');
-    await addDoc(collection(db,'candidates'),{nomor,ketua:g('kt'),wakil:g('wk'),visi:g('vs'),misi:g('ms'),program:g('pg'),foto,urutan:+g('od')||nomor,aktif:true});await log('Tambah kandidat','No. '+nomor);shell()});
-  m.querySelectorAll('[data-d]').forEach(b=>b.onclick=guard(async()=>{if(!confirm('Hapus kandidat ini?'))return;await deleteDoc(doc(db,'candidates',b.dataset.d));await log('Hapus kandidat');shell()}));
+  let editId=null,foto='';
+  const form=c=>`<div class="card"><h2>${c?'Edit kandidat':'Tambah kandidat'}</h2><div class="grid c2"><div><label>Nomor urut</label><input id="nr" type="number" min="1" value="${esc(c?.nomor??'')}"></div><div><label>Urutan tampil</label><input id="od" type="number" value="${esc(c?.urutan??'')}"></div><div><label>Nama calon ketua</label><input id="kt" value="${esc(c?.ketua??'')}"></div><div><label>Nama calon wakil</label><input id="wk" value="${esc(c?.wakil??'')}"></div></div>
+  <label>Foto: unggah file</label><input type="file" id="ph" accept="image/*"><label>atau tempel link gambar</label><input id="fu" placeholder="https://contoh.com/foto.jpg" value="${esc((c?.foto||'').startsWith('data:')?'':(c?.foto||''))}">
+  <img id="pp" alt="Pratinjau foto" style="max-height:140px;margin-top:.5rem;border-radius:10px" ${c?.foto?`src="${esc(c.foto)}"`:''}>
+  <label>Visi</label><textarea id="vs">${esc(c?.visi??'')}</textarea><label>Misi</label><textarea id="ms">${esc(c?.misi??'')}</textarea><label>Program kerja</label><textarea id="pg">${esc(c?.program??'')}</textarea>
+  <div class="row" style="margin-top:1rem"><button class="btn" id="sv">${c?'Simpan perubahan':'Simpan kandidat'}</button>${c?'<button class="btn alt" id="cn">Batal</button>':''}</div></div>`;
+  const draw=()=>{
+    const c=C.find(x=>x.id===editId);foto=c?.foto||'';
+    m.innerHTML=`<h1>Kandidat</h1>${lock?'<div class="msg">Data kandidat terkunci karena pemilihan sudah dimulai (mode produksi).</div>':(demo&&started?'<div class="msg">Mode percobaan aktif: kandidat masih bisa diubah.</div>':'')+form(c)}
+    <div class="grid c2">${C.map(k=>`<div class="card" style="margin:0">${k.foto?`<img src="${esc(k.foto)}" alt="" style="width:100%;max-height:160px;object-fit:cover;border-radius:10px">`:''}<h2>No. ${esc(k.nomor)} — ${esc(k.ketua)} &amp; ${esc(k.wakil)}</h2><p><b>Visi:</b> ${esc(k.visi)}</p>${lock?'':`<div class="row"><button class="btn alt sm" data-e="${k.id}">Edit</button><button class="btn red sm" data-d="${k.id}">Hapus</button></div>`}</div>`).join('')||'<div class="card">Belum ada kandidat yang tersedia.</div>'}</div>`;
+    if(lock)return;
+    $('#ph').onchange=guard(async e=>{const f=e.target.files[0];if(!f)return;if(!/^image\/(png|jpeg|webp)$/.test(f.type)||f.size>5e6)return alert('Foto harus PNG/JPG/WEBP maksimal 5 MB.');foto=await img2url(f,640,'image/jpeg',.72);$('#fu').value='';$('#pp').src=foto});
+    $('#fu').oninput=()=>{foto=$('#fu').value.trim();if(foto)$('#pp').src=foto;else $('#pp').removeAttribute('src')};
+    $('#sv').onclick=guard(async()=>{
+      const g=i=>$('#'+i).value.trim(),nomor=+g('nr');
+      if(!nomor||!g('kt')||!g('wk'))return alert('Nomor urut, nama ketua, dan nama wakil wajib diisi.');
+      if(C.some(k=>k.nomor===nomor&&k.id!==editId))return alert('Nomor urut sudah dipakai.');
+      if(foto&&!/^(https?:\/\/|data:image\/)/i.test(foto))return alert('Link gambar harus diawali http:// atau https://');
+      const data={nomor,ketua:g('kt'),wakil:g('wk'),visi:g('vs'),misi:g('ms'),program:g('pg'),foto,urutan:+g('od')||nomor,aktif:true};
+      if(editId){await updateDoc(doc(db,'candidates',editId),data);await log('Edit kandidat','No. '+nomor)}
+      else{await addDoc(collection(db,'candidates'),data);await log('Tambah kandidat','No. '+nomor)}
+      shell();
+    });
+    if($('#cn'))$('#cn').onclick=()=>{editId=null;draw()};
+    m.querySelectorAll('[data-e]').forEach(b=>b.onclick=()=>{editId=b.dataset.e;draw();window.scrollTo(0,0)});
+    m.querySelectorAll('[data-d]').forEach(b=>b.onclick=guard(async()=>{if(!confirm('Hapus kandidat ini?'))return;await deleteDoc(doc(db,'candidates',b.dataset.d));await log('Hapus kandidat');shell()}));
+  };
+  draw();
 }
 
 /* ---------- Pengaturan pemilihan ---------- */
 async function pSet(m){
+  const demo=E.demo!==false;
   m.innerHTML=`<h1>Pengaturan Pemilihan</h1><div class="card"><p>Status: <span class="tag">${ST[E.status]}</span> · Zona waktu: Asia/Jakarta · Waktu mulai/selesai diperiksa oleh server.</p>
   <label>Nama pemilihan</label><input id="nm" value="${esc(E.nama)}"><label>Periode</label><input id="pr" value="${esc(E.periode||'')}">
   <div class="grid c2"><div><label>Mulai</label><input type="datetime-local" id="st" value="${loc(E.mulai)}"></div><div><label>Selesai</label><input type="datetime-local" id="en" value="${loc(E.selesai)}"></div></div>
-  <div class="row" style="margin-top:1rem"><button class="btn" id="sv">Simpan</button><button class="btn alt" id="rd">Tandai siap</button><button class="btn" id="op">Buka pemilihan</button><button class="btn red" id="cl">Tutup pemilihan</button></div></div>`;
+  <div class="row" style="margin-top:1rem"><button class="btn" id="sv">Simpan</button><button class="btn alt" id="rd">Tandai siap</button><button class="btn" id="op">Buka pemilihan</button><button class="btn red" id="cl">Tutup pemilihan</button></div></div>
+  <div class="card"><h2>Mode ${demo?'percobaan':'produksi'}</h2>${demo?'<p>Saat ini <b>mode percobaan</b>: kandidat dan data pemilih bisa diubah atau dihapus, dan data uji bisa direset. Setelah semuanya siap untuk pemilihan sungguhan, pindah ke mode produksi.</p><div class="row"><button class="btn red" id="rs">Reset data percobaan</button><button class="btn alt" id="pd">Mulai produksi (permanen)</button></div><small>Reset menghapus semua token, klaim, dan suara, lalu mengembalikan status ke Draft. Data siswa dan kandidat tetap ada.</small>':'<p>Mode <b>produksi</b>: token, klaim, dan suara terkunci. Mode ini tidak bisa dikembalikan.</p>'}</div>`;
   const setS=guard(async(to,msg)=>{if(!confirm(msg))return;if(to!=='selesai'&&!(await cnt('candidates')))return alert('Tambahkan kandidat terlebih dahulu.');await updateDoc(doc(db,'elections','main'),{status:to});await log('Status pemilihan',ST[to]);shell()});
   $('#sv').onclick=guard(async()=>{const a=$('#st').value,b=$('#en').value;if(a&&b&&new Date(b)<=new Date(a))return alert('Waktu selesai harus setelah waktu mulai.');await updateDoc(doc(db,'elections','main'),{nama:$('#nm').value.trim(),periode:$('#pr').value.trim(),mulai:a?Timestamp.fromDate(new Date(a)):null,selesai:b?Timestamp.fromDate(new Date(b)):null});await log('Ubah pengaturan pemilihan');shell()});
   $('#rd').onclick=()=>setS('siap','Tandai pemilihan siap?');
   $('#op').onclick=()=>setS('berlangsung','Buka pemilihan? Data kandidat akan terkunci.');
   $('#cl').onclick=()=>setS('selesai','Tutup pemilihan? Pemilih tidak bisa lagi memberikan suara.');
+  if(demo){
+    const delAll=async n=>{const d=await getDocs(collection(db,n));let bt=writeBatch(db),c=0;for(const x of d.docs){bt.delete(x.ref);if(++c===400){await bt.commit();bt=writeBatch(db);c=0}}if(c)await bt.commit()};
+    $('#rs').onclick=guard(async()=>{if(!confirm('Hapus semua token, klaim, dan suara percobaan, lalu kembalikan status ke Draft?'))return;for(const n of['ballots','claims','tokens'])await delAll(n);await updateDoc(doc(db,'elections','main'),{status:'draft'});await log('Reset data percobaan');alert('Data percobaan direset. Terbitkan token baru di menu Data Pemilih.');shell()});
+    $('#pd').onclick=guard(async()=>{if(!confirm('Mulai mode produksi? Ini TIDAK bisa dibatalkan.'))return;if(!confirm('Yakin? Setelah ini data tidak bisa direset.'))return;await updateDoc(doc(db,'elections','main'),{demo:false});await log('Mulai mode produksi');shell()});
+  }
 }
 
 /* ---------- Hasil ---------- */
