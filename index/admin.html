@@ -57,6 +57,19 @@ const log=(aksi,detail='')=>addDoc(collection(db,'audit'),{aksi,detail,by:auth.c
 const img2url=(f,max,type,q)=>new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>{const i=new Image();i.onload=()=>{const k=Math.min(1,max/Math.max(i.width,i.height)),c=document.createElement('canvas');c.width=Math.round(i.width*k);c.height=Math.round(i.height*k);c.getContext('2d').drawImage(i,0,0,c.width,c.height);res(c.toDataURL(type,q))};i.onerror=rej;i.src=r.result};r.onerror=rej;r.readAsDataURL(f)});
 const guard=fn=>async(...a)=>{try{return await fn(...a)}catch(e){alert('Gagal: '+(e.code==='permission-denied'?'tidak diizinkan oleh aturan keamanan (mungkin pemilihan sudah dimulai).':(e.message||e)));}};
 let E={status:'draft'};
+/* PDF: pustaka dimuat saat pertama dipakai */
+let _pdf=null;
+const loadPdf=()=>_pdf||(_pdf=new Promise((res,rej)=>{
+  const ld=u=>new Promise((a,b)=>{const t=document.createElement('script');t.src=u;t.onload=a;t.onerror=()=>b(new Error('Gagal memuat pustaka PDF. Periksa koneksi internet.'));document.head.appendChild(t)});
+  ld('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js').then(()=>ld('https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js')).then(()=>res(window.jspdf)).catch(e=>{_pdf=null;rej(e)});
+}));
+const makePdf=async(title,sub,head,rows,file)=>{
+  const {jsPDF}=await loadPdf(),d=new jsPDF();
+  d.setFontSize(16);d.text(String(title),14,18);d.setFontSize(10);d.text(String(sub),14,25,{maxWidth:182});
+  d.autoTable({head:[head],body:rows.map(r=>r.map(String)),startY:33,styles:{fontSize:10},headStyles:{fillColor:[18,63,112]}});
+  d.save(file);
+};
+const now=()=>new Date().toLocaleString('id-ID',{timeZone:'Asia/Jakarta'});
 
 /* ---------- Login ---------- */
 function loginView(msg=''){
@@ -138,8 +151,9 @@ async function pStud(m){
     const out=[];let bt=writeBatch(db),n=0;
     for(const id of ids){const s=S.find(x=>x.id===id),p=rnd(10),h=await H(p);bt.set(doc(db,'tokens',h),{sid:id,used:false});out.push([s.no,s.n,s.k,p]);if(++n===400){await bt.commit();bt=writeBatch(db);n=0}}
     if(n)await bt.commit();await log('Terbitkan token',out.length+' token');
-    $('#tk').innerHTML=`<div class="card"><h2>Token baru (tampil sekali)</h2><p>Cetak atau simpan sekarang. Sistem hanya menyimpan hash, jadi token tidak bisa dilihat lagi.</p><div class="tw"><table><tr><th>No</th><th>Nama</th><th>Kelas</th><th>Token</th></tr>${out.map(o=>`<tr><td>${esc(o[0])}</td><td>${esc(o[1])}</td><td>${esc(o[2])}</td><td class="tok"><b>${o[3]}</b></td></tr>`).join('')}</table></div><button class="btn sm noprint" style="margin-top:.75rem" onclick="print()">Cetak</button></div>`;
+    $('#tk').innerHTML=`<div class="card"><h2>Token baru (tampil sekali)</h2><p>Cetak atau simpan sekarang. Sistem hanya menyimpan hash, jadi token tidak bisa dilihat lagi.</p><div class="tw"><table><tr><th>No</th><th>Nama</th><th>Kelas</th><th>Token</th></tr>${out.map(o=>`<tr><td>${esc(o[0])}</td><td>${esc(o[1])}</td><td>${esc(o[2])}</td><td class="tok"><b>${o[3]}</b></td></tr>`).join('')}</table></div><div class="row noprint" style="margin-top:.75rem"><button class="btn sm" onclick="print()">Cetak</button><button class="btn sm alt" id="tpdf">Unduh PDF</button></div></div>`;
     $('#tk').scrollIntoView();
+    $('#tpdf').onclick=guard(()=>makePdf('Daftar Token Pemilih','Dibuat: '+now()+' · Token bersifat rahasia dan hanya berlaku sekali.',['No','Nama','Kelas','Token'],out,'token-pemilih.pdf'));
     out.forEach(o=>{const s=S.find(x=>x.no===o[0]);if(s)T[s.id]={used:false}});draw();
   });
   const draw=()=>{
@@ -222,8 +236,9 @@ async function pRes(m){
   m.innerHTML=`<h1>Hasil</h1><div class="grid s"><div class="card stat" style="margin:0"><b>${tot}</b><span>Suara masuk</span></div><div class="card stat" style="margin:0"><b>${sum}</b><span>Suara sah</span></div><div class="card stat" style="margin:0"><b>${el?Math.round(cl/el*100):0}%</b><span>Partisipasi</span></div></div>
   ${sum===tot&&tot===cl?'<div class="msg">Pemeriksaan: jumlah suara, suara sah, dan token terpakai cocok.</div>':`<div class="msg" style="background:#fde7e5">Peringatan: suara masuk (${tot}), suara sah (${sum}), dan token terpakai (${cl}) tidak sama. Periksa sebelum mengumumkan hasil.</div>`}
   <div class="card">${C.map(c=>{const p=tot?c.n/tot*100:0;return`<div><b>No. ${esc(c.nomor)} ${esc(c.ketua)} &amp; ${esc(c.wakil)}</b> — ${c.n} suara (${p.toFixed(1)}%)<div class="bar"><i style="width:${p}%"></i></div></div>`}).join('')||'Belum ada kandidat.'}
-  <div class="row noprint"><button class="btn" id="ex">Ekspor CSV</button><button class="btn alt" onclick="print()">Ekspor PDF (cetak)</button></div></div>`;
+  <div class="row noprint"><button class="btn" id="ex">Ekspor CSV</button><button class="btn alt" id="pf">Unduh PDF</button><button class="btn alt" onclick="print()">Cetak</button></div></div>`;
   $('#ex').onclick=()=>{const q=v=>'"'+String(v).replace(/"/g,'""')+'"',csv='Nomor urut,Ketua,Wakil,Suara,Persen\n'+C.map(c=>[c.nomor,c.ketua,c.wakil,c.n,tot?(c.n/tot*100).toFixed(1):0].map(q).join(',')).join('\n'),a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));a.download='hasil-evote-osim.csv';a.click();log('Ekspor hasil CSV')};
+  $('#pf').onclick=guard(async()=>{await makePdf(E.nama||'Hasil Pemilihan','Suara masuk: '+tot+' · Suara sah: '+sum+' · Partisipasi: '+(el?Math.round(cl/el*100):0)+'% · Dibuat: '+now(),['No','Calon Ketua','Calon Wakil','Suara','Persen'],C.map(c=>[c.nomor,c.ketua,c.wakil,c.n,(tot?(c.n/tot*100).toFixed(1):0)+'%']),'hasil-evote-osim.pdf');log('Ekspor hasil PDF')});
 }
 
 /* ---------- Audit ---------- */
