@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>E-VOTE OSIM</title>
+<style>
+:root{--navy:#123F70;--blue:#1769AA;--sky:#63A9E8;--light:#D8ECFF;--ice:#EAF5FF;--txt:#18344F;--red:#b3261e;--ok:#1b7f4b}
+*{box-sizing:border-box}
+body{margin:0;font-family:"Segoe UI",system-ui,-apple-system,Roboto,sans-serif;background:var(--ice);color:var(--txt);line-height:1.5}
+h1,h2,h3{color:var(--navy);margin:0 0 .5rem;line-height:1.25}
+h1{font-size:1.5rem}h2{font-size:1.25rem}h3{font-size:1.05rem}
+a{color:var(--blue)}
+.wrap{max-width:1100px;margin:0 auto;padding:1rem}
+.narrow{max-width:460px}
+.card{background:#fff;border-radius:16px;box-shadow:0 2px 10px rgba(18,63,112,.08);padding:1.25rem;margin-bottom:1rem}
+.brand{display:flex;align-items:center;gap:.75rem;margin-bottom:1rem}
+.brand img,.brand svg{width:48px;height:48px;object-fit:contain;flex:none}
+.brand b{display:block;color:var(--navy);font-size:1.15rem}.brand small{color:var(--blue)}
+.btn{display:inline-block;min-height:44px;padding:.6rem 1.1rem;border:0;border-radius:12px;background:var(--blue);color:#fff;font:inherit;font-weight:600;cursor:pointer;text-align:center;text-decoration:none}
+.btn:hover{background:var(--navy)}.btn:disabled{opacity:.6;cursor:wait}
+.btn.alt{background:var(--light);color:var(--navy)}.btn.alt:hover{background:var(--sky)}
+.btn.red{background:var(--red)}.btn.sm{min-height:36px;padding:.3rem .7rem;font-size:.9rem}
+.btn.full{width:100%}
+input,select,textarea{width:100%;min-height:44px;padding:.55rem .75rem;border:1px solid #b9d3ea;border-radius:10px;font:inherit;color:var(--txt);background:#fff}
+textarea{min-height:80px}
+label{display:block;font-weight:600;margin:.75rem 0 .25rem;font-size:.92rem}
+:focus-visible{outline:3px solid var(--sky);outline-offset:2px}
+.err{color:var(--red);min-height:1.4em;margin:.5rem 0}
+.msg{background:var(--light);border-radius:10px;padding:.75rem;margin:.75rem 0}
+.grid{display:grid;gap:1rem;grid-template-columns:1fr}
+@media(min-width:768px){.grid.c2,.grid.c3{grid-template-columns:repeat(2,1fr)}.grid.s4{grid-template-columns:repeat(2,1fr)}}
+@media(min-width:992px){.grid.c3{grid-template-columns:repeat(3,1fr)}.grid.s4{grid-template-columns:repeat(3,1fr)}}
+.cand{display:flex;flex-direction:column;margin:0}
+.cand .ph{width:100%;aspect-ratio:4/3;border-radius:12px;background:var(--light);object-fit:cover;display:grid;place-items:center;color:var(--blue);font-size:3rem;font-weight:700}
+.no{display:inline-block;background:var(--navy);color:#fff;border-radius:999px;padding:.1rem .8rem;font-weight:700;margin:.6rem 0 .2rem}
+.cand p{white-space:pre-line;margin:.2rem 0 .6rem;font-size:.95rem}
+.cand .btn{margin-top:auto}
+.stat b{font-size:1.8rem;color:var(--navy);display:block}.stat span{color:var(--blue);font-size:.9rem}
+.tag{display:inline-block;padding:.1rem .6rem;border-radius:999px;background:var(--light);color:var(--navy);font-weight:600;font-size:.85rem}
+.tag.ok{background:#d9f3e4;color:var(--ok)}
+.center{text-align:center}
+.ico{width:76px;height:76px;border-radius:50%;background:var(--ok);color:#fff;font-size:2.6rem;display:grid;place-items:center;margin:0 auto 1rem}
+/* admin */
+.adm{display:block}
+.side{background:var(--navy);color:#fff;padding:1rem}
+.side .brand b,.side .brand small{color:#fff}
+.side nav{display:none;flex-direction:column;gap:.25rem;margin-top:.5rem}
+.side nav.open{display:flex}
+.side nav a{color:#fff;text-decoration:none;padding:.65rem .75rem;border-radius:10px}
+.side nav a.on,.side nav a:hover{background:var(--blue)}
+.burger{float:right;background:transparent;border:1px solid #fff;color:#fff;border-radius:10px;min-height:44px;padding:0 .9rem;font-size:1.2rem}
+.main{padding:1rem}
+.tw{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:.92rem}
+th,td{padding:.5rem;border-bottom:1px solid var(--light);text-align:left;white-space:nowrap}
+th{color:var(--navy);background:var(--ice)}
+.bar{height:22px;background:var(--light);border-radius:8px;overflow:hidden;margin:.25rem 0 .75rem}
+.bar i{display:block;height:100%;background:var(--blue)}
+.row{display:flex;gap:.5rem;flex-wrap:wrap;align-items:center}
+.tok{font-family:ui-monospace,Consolas,monospace;letter-spacing:.05em}
+@media(min-width:992px){
+ .adm{display:grid;grid-template-columns:250px 1fr;min-height:100vh}
+ .burger{display:none}.side nav{display:flex}.side{position:sticky;top:0;height:100vh}
+ .main{padding:1.5rem}
+}
+@media print{.side,.noprint,.burger{display:none!important}.adm{display:block}}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+/* ===== Data (localStorage). Tanpa data kandidat/sekolah bawaan. ===== */
+const KEY='evote_osim_v1';
+let D;
+try{D=JSON.parse(localStorage.getItem(KEY)||'null')}catch(e){D=null}
+D=D||{s:{portal:'E-VOTE OSIM',school:'',period:'',welcome:'',footer:'',logo:'',status:'draft',start:'',end:''},c:[],st:[],t:[],b:[],a:[],adm:{u:'admin',h:null},seq:1};
+const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(D))}catch(e){alert('Penyimpanan penuh. Gunakan foto lebih kecil.')}};
+const $=s=>document.querySelector(s),app=$('#app');
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+async function H(x){try{const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(x));return[...new Uint8Array(b)].map(v=>v.toString(16).padStart(2,'0')).join('')}catch(e){let h=5381;for(const ch of x)h=(h*33^ch.charCodeAt(0))>>>0;return'f'+h}}
+const rnd=(n)=>{const A='ABCDEFGHJKMNPQRSTUVWXYZ23456789';const a=new Uint32Array(n);crypto.getRandomValues(a);return[...a].map(v=>A[v%A.length]).join('')};
+const log=(x)=>{D.a.unshift({w:new Date().toLocaleString('id-ID',{timeZone:'Asia/Jakarta'}),x});D.a=D.a.slice(0,200);save()};
+const open=()=>D.s.status==='berlangsung'&&(!D.s.start||Date.now()>=new Date(D.s.start))&&(!D.s.end||Date.now()<=new Date(D.s.end));
+const sess=()=>sessionStorage;
+const ICON='<svg viewBox="0 0 48 48" aria-hidden="true"><rect x="6" y="22" width="36" height="20" rx="4" fill="#1769AA"/><rect x="16" y="8" width="16" height="22" rx="2" fill="#fff" stroke="#123F70" stroke-width="2.5" transform="rotate(-8 24 19)"/><path d="M19 17l4 4 7-8" fill="none" stroke="#1769AA" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" transform="rotate(-8 24 19)"/><rect x="14" y="28" width="20" height="3" rx="1.5" fill="#D8ECFF"/></svg>';
+const logo=()=>D.s.logo?`<img src="${esc(D.s.logo)}" alt="Logo" onerror="this.outerHTML=ICON_FALLBACK">`:ICON;
+window.ICON_FALLBACK=ICON;
+const brand=()=>`<div class="brand">${logo()}<div><b>${esc(D.s.portal||'E-VOTE OSIM')}</b><small>Digital Student Election${D.s.school?' · '+esc(D.s.school):''}</small></div></div>`;
+const foot=()=>D.s.footer?`<p class="center" style="color:var(--blue);font-size:.85rem">${esc(D.s.footer)}</p>`:'';
+
+/* ===== Router ===== */
+const go=h=>{location.hash=h};
+window.addEventListener('hashchange',render);
+function render(){
+  const r=(location.hash||'#/vote/access').slice(1);
+  window.scrollTo(0,0);
+  if(r.startsWith('/admin')){
+    if(r==='/admin/login'||(!sess().adm&&r!=='/admin/login')){return aLogin()}
+    const m={'/admin/dashboard':aDash,'/admin/branding':aBrand,'/admin/students':aStud,'/admin/candidates':aCand,'/admin/settings':aSet,'/admin/results':aRes,'/admin/audit':aAud};
+    return aShell(r,(m[r]||aDash)());
+  }
+  const m={'/vote/access':vAccess,'/vote/candidates':vCand,'/vote/confirmation':vConf,'/vote/success':vOk};
+  const needs=r==='/vote/candidates'||r==='/vote/confirmation';
+  if(needs&&!sess().tid)return go('#/vote/access');
+  if(r==='/vote/confirmation'&&!sess().pick)return go('#/vote/candidates');
+  (m[r]||vAccess)();
+}
+
+/* ===== PORTAL PEMILIH ===== */
+function vAccess(){
+  app.innerHTML=`<div class="wrap narrow">${brand()}<div class="card"><h1>Verifikasi Hak Pilih</h1>
+  <p>${esc(D.s.welcome||'Masukkan kode akses yang diberikan panitia untuk mulai memilih.')}</p>
+  <label for="pin">Kode akses</label><input id="pin" autocomplete="off" autocapitalize="characters" maxlength="20" placeholder="Contoh: AB3K9XQ2">
+  <div class="err" id="e" role="alert"></div><button class="btn full" id="b">Verifikasi</button></div>
+  ${foot()}</div>`;
+  const run=async()=>{
+    const p=$('#pin').value.trim().toUpperCase().replace(/\s/g,'');const e=$('#e');
+    if(!p){e.textContent='Kode akses wajib diisi.';return}
+    $('#b').disabled=true;const h=await H(p);const t=D.t.find(x=>x.h===h);$('#b').disabled=false;
+    if(!t){e.textContent='Kode tidak ditemukan. Periksa kembali kode Anda.';return}
+    if(t.used){e.textContent='Kode ini sudah digunakan.';return}
+    if(!open()){e.textContent='Pemilihan belum dibuka atau sudah ditutup.';return}
+    sess().tid=h;sess().pick='';go('#/vote/candidates');
+  };
+  $('#b').onclick=run;$('#pin').onkeydown=e=>{if(e.key==='Enter')run()};
+}
+const cInit=c=>(c.nr||'?');
+function vCand(){
+  const list=D.c.filter(c=>c.on!==false).sort((a,b)=>a.ord-b.ord||a.nr-b.nr);
+  app.innerHTML=`<div class="wrap">${brand()}<h1>Kandidat Ketua dan Wakil Ketua OSIM</h1>
+  <p>Baca visi dan misi setiap pasangan calon, lalu pilih satu.</p>
+  ${list.length?`<div class="grid c3">${list.map(c=>`<div class="card cand">${c.photo?`<img class="ph" src="${esc(c.photo)}" alt="Foto pasangan calon nomor ${esc(c.nr)}">`:`<div class="ph">${esc(cInit(c))}</div>`}
+  <div><span class="no">No. ${esc(c.nr)}</span><h3>${esc(c.ketua)}</h3><h3 style="font-weight:500">${esc(c.wakil)}</h3></div>
+  <h3>Visi</h3><p>${esc(c.visi)}</p><h3>Misi</h3><p>${esc(c.misi)}</p><h3>Program kerja</h3><p>${esc(c.prog)}</p>
+  <button class="btn" data-id="${c.id}">Pilih Kandidat Ini</button></div>`).join('')}</div>`:'<div class="card center">Belum ada kandidat yang tersedia.</div>'}${foot()}</div>`;
+  app.querySelectorAll('[data-id]').forEach(b=>b.onclick=()=>{sess().pick=b.dataset.id;go('#/vote/confirmation')});
+}
+function vConf(){
+  const c=D.c.find(x=>String(x.id)===sess().pick);if(!c){sess().pick='';return go('#/vote/candidates')}
+  app.innerHTML=`<div class="wrap narrow">${brand()}<div class="card center"><h1>Konfirmasi Pilihan Anda</h1>
+  ${c.photo?`<img class="ph" style="width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:12px" src="${esc(c.photo)}" alt="Foto kandidat terpilih">`:''}
+  <div class="no">No. ${esc(c.nr)}</div><h2>${esc(c.ketua)}</h2><h3 style="font-weight:500">${esc(c.wakil)}</h3>
+  <p><b>Apakah Anda yakin dengan pilihan ini?</b></p><div class="err" id="e" role="alert"></div>
+  <div class="grid"><button class="btn" id="ok">Kirim Suara</button><button class="btn alt" id="bk">Kembali</button></div></div></div>`;
+  $('#bk').onclick=()=>go('#/vote/candidates');
+  let busy=false;
+  $('#ok').onclick=async()=>{
+    if(busy)return;busy=true;const b=$('#ok');b.disabled=true;b.textContent='Mengirim…';$('#bk').disabled=true;
+    await new Promise(r=>setTimeout(r,500));
+    /* Validasi ulang + simpan suara & tandai token dalam satu langkah atomik */
+    const t=D.t.find(x=>x.h===sess().tid),cc=D.c.find(x=>String(x.id)===sess().pick&&x.on!==false),e=$('#e');
+    let msg='';
+    if(!t)msg='Sesi tidak valid.';else if(t.used)msg='Kode ini sudah digunakan.';else if(!open())msg='Pemilihan tidak sedang berlangsung.';else if(!cc)msg='Kandidat tidak valid.';
+    if(msg){e.textContent=msg;busy=false;b.disabled=false;b.textContent='Kirim Suara';$('#bk').disabled=false;return}
+    t.used=true;D.b.push({id:rnd(12),cid:cc.id});save();
+    sess().clear();sess().done='1';go('#/vote/success');
+  };
+}
+function vOk(){
+  if(!sess().done)return go('#/vote/access');
+  app.innerHTML=`<div class="wrap narrow">${brand()}<div class="card center"><div class="ico">✓</div><h1>Suara Berhasil Dikirim</h1>
+  <p>Terima kasih sudah berpartisipasi. Proses pemilihan Anda telah selesai.</p></div>${foot()}</div>`;
+}
+
+/* ===== PANEL ADMIN ===== */
+async function aLogin(){
+  if(!D.adm.h)D.adm.h=await H('admin123');save();
+  app.innerHTML=`<div class="wrap narrow">${brand()}<div class="card"><h1>Login Admin</h1>
+  <label for="u">Username</label><input id="u" autocomplete="username"><label for="p">Password</label><input id="p" type="password" autocomplete="current-password">
+  <div class="err" id="e" role="alert"></div><button class="btn full" id="b">Masuk</button>
+  <p class="msg" style="font-size:.85rem">Demo: username <b>admin</b>, password <b>admin123</b>. Ganti di menu Pengaturan.</p></div>
+  <p class="center"><a href="#/vote/access">Ke portal pemilih</a></p></div>`;
+  const run=async()=>{
+    const lock=+sess().lock||0;if(Date.now()<lock){$('#e').textContent='Terlalu banyak percobaan. Coba lagi sebentar.';return}
+    const ok=$('#u').value.trim()===D.adm.u&&await H($('#p').value)===D.adm.h;
+    if(ok){sess().fail=0;sess().adm='1';log('Login admin');go('#/admin/dashboard')}
+    else{sess().fail=(+sess().fail||0)+1;if(sess().fail>=5){sess().lock=Date.now()+60000;sess().fail=0}$('#e').textContent='Username atau password salah.'}
+  };
+  $('#b').onclick=run;$('#p').onkeydown=e=>{if(e.key==='Enter')run()};
+}
+const NAV=[['dashboard','Dashboard'],['branding','Identitas Portal'],['students','Data Pemilih'],['candidates','Kandidat'],['settings','Pengaturan'],['results','Hasil'],['audit','Audit']];
+function aShell(r,html){
+  app.innerHTML=`<div class="adm"><aside class="side"><button class="burger" id="bg" aria-label="Menu">☰</button>${brand()}
+  <nav id="nv">${NAV.map(n=>`<a href="#/admin/${n[0]}" class="${r==='/admin/'+n[0]?'on':''}">${n[1]}</a>`).join('')}<a href="#/vote/access">Portal pemilih</a><a href="#" id="lo">Keluar</a></nav></aside>
+  <main class="main">${html}</main></div>`;
+  $('#bg').onclick=()=>$('#nv').classList.toggle('open');
+  $('#lo').onclick=e=>{e.preventDefault();log('Logout admin');sess().removeItem('adm');go('#/admin/login')};
+  if(window.__after){const f=window.__after;window.__after=null;f()}
+}
+const stats=()=>{const tot=D.st.filter(s=>s.on&&s.el).length,v=D.b.length;return{tot,v,n:Math.max(tot-v,0),p:tot?Math.round(v/tot*100):0}};
+const ST={draft:'Draft',siap:'Siap',berlangsung:'Berlangsung',selesai:'Selesai'};
+function aDash(){
+  const s=stats();
+  return`<h1>Dashboard</h1><div class="grid s4">${[['Total pemilih',s.tot],['Sudah memilih',s.v],['Belum memilih',s.n],['Partisipasi',s.p+'%'],['Total kandidat',D.c.filter(c=>c.on!==false).length],['Status',ST[D.s.status]]].map(x=>`<div class="card stat" style="margin:0"><b>${x[1]}</b><span>${x[0]}</span></div>`).join('')}</div>
+  <div class="card" style="margin-top:1rem"><h2>Grafik partisipasi</h2><div class="bar"><i style="width:${s.p}%"></i></div><small>${s.v} dari ${s.tot} pemilih sudah memberikan suara.</small></div>
+  <div class="card"><h2>Jadwal</h2><p>Mulai: ${D.s.start?new Date(D.s.start).toLocaleString('id-ID'):'belum diatur'}<br>Selesai: ${D.s.end?new Date(D.s.end).toLocaleString('id-ID'):'belum diatur'}</p></div>
+  <div class="card"><h2>Aktivitas terbaru</h2>${D.a.slice(0,5).map(a=>`<div>${esc(a.w)} — ${esc(a.x)}</div>`).join('')||'Belum ada aktivitas.'}</div>`;
+}
+function aBrand(){
+  window.__after=()=>{
+    const f=(id)=>$('#'+id);
+    f('lf').onchange=e=>{const x=e.target.files[0];if(!x)return;if(!/^image\/(png|jpeg|webp|gif)$/.test(x.type)||x.size>300000){alert('Logo harus PNG/JPG/WEBP/GIF maksimal 300 KB.');e.target.value='';return}const r=new FileReader();r.onload=()=>{f('lu').value=r.result;f('pv').src=r.result};r.readAsDataURL(x)};
+    f('lu').oninput=()=>f('pv').src=f('lu').value||'';
+    f('sv').onclick=()=>{Object.assign(D.s,{portal:f('pn').value.trim()||'E-VOTE OSIM',school:f('sn').value.trim(),period:f('pr').value.trim(),welcome:f('wl').value.trim(),footer:f('ft').value.trim(),logo:f('lu').value.trim()});save();log('Ubah identitas portal');render()};
+    f('rl').onclick=()=>{D.s.logo='';save();log('Reset logo');render()};
+  };
+  return`<h1>Identitas Portal</h1><div class="card"><label>Nama portal</label><input id="pn" value="${esc(D.s.portal)}"><label>Nama sekolah</label><input id="sn" value="${esc(D.s.school)}">
+  <label>Periode pemilihan</label><input id="pr" value="${esc(D.s.period)}"><label>Teks sambutan</label><textarea id="wl">${esc(D.s.welcome)}</textarea><label>Informasi footer</label><input id="ft" value="${esc(D.s.footer)}">
+  <label>Logo — unggah file</label><input type="file" id="lf" accept="image/*"><label>atau URL logo</label><input id="lu" value="${esc(D.s.logo.startsWith('data:')?'':D.s.logo)}" placeholder="https://...">
+  <p>Pratinjau:</p><img id="pv" alt="Pratinjau logo" style="max-height:72px" src="${esc(D.s.logo)}">
+  <div class="row" style="margin-top:1rem"><button class="btn" id="sv">Simpan</button><button class="btn alt" id="rl">Pakai logo sementara</button></div></div>`;
+}
+function aStud(){
+  const cls=[...new Set(D.st.map(s=>s.k))].sort();
+  window.__after=()=>{
+    const q=()=>{const t=$('#q').value.toLowerCase(),k=$('#fk').value;
+      $('#tb').innerHTML=D.st.filter(s=>(!k||s.k===k)&&(s.n+s.no).toLowerCase().includes(t)).map(s=>{const tk=D.t.find(x=>x.sid===s.id);return`<tr><td>${esc(s.no)}</td><td>${esc(s.n)}</td><td>${esc(s.k)}</td><td>${s.on&&s.el?'Berhak':'Nonaktif'}</td><td>${tk?(tk.used?'<span class="tag ok">Sudah memilih</span>':'<span class="tag">Token terbit</span>'):'—'}</td>
+      <td class="row">${tk?'':`<button class="btn sm" data-t="${s.id}">Terbitkan token</button>`}<button class="btn sm alt" data-x="${s.id}">${s.on?'Nonaktifkan':'Aktifkan'}</button></td></tr>`}).join('')||'<tr><td colspan="6">Belum ada data pemilih.</td></tr>';
+      $('#tb').querySelectorAll('[data-x]').forEach(b=>b.onclick=()=>{const s=D.st.find(x=>x.id==b.dataset.x);s.on=!s.on;save();log('Ubah status pemilih');render()});
+      $('#tb').querySelectorAll('[data-t]').forEach(b=>b.onclick=()=>issue([+b.dataset.t]));
+    };
+    $('#q').oninput=q;$('#fk').onchange=q;q();
+    $('#add').onclick=()=>{const no=$('#no').value.trim(),n=$('#nm').value.trim(),k=$('#kl').value.trim();if(!no||!n||!k)return alert('Semua kolom wajib diisi.');if(D.st.some(s=>s.no===no))return alert('Nomor siswa sudah ada.');D.st.push({id:D.seq++,no,n,k,on:true,el:true});save();log('Tambah pemilih');render()};
+    $('#csv').onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{let c=0;r.result.split(/\r?\n/).forEach(l=>{const p=l.split(/[;,]/).map(x=>x.trim());if(p.length<3||/^(nomor|no)/i.test(p[0])||!p[0]||D.st.some(s=>s.no===p[0]))return;D.st.push({id:D.seq++,no:p[0],n:p[1],k:p[2],on:true,el:true});c++});save();log('Impor CSV: '+c+' pemilih');alert(c+' pemilih diimpor.');render()};r.readAsText(f)};
+    $('#all').onclick=()=>{const ids=D.st.filter(s=>s.on&&s.el&&!D.t.some(t=>t.sid===s.id)).map(s=>s.id);if(!ids.length)return alert('Semua pemilih aktif sudah punya token.');issue(ids)};
+  };
+  async function issue(ids){
+    const out=[];for(const id of ids){const s=D.st.find(x=>x.id===id),p=rnd(8);D.t.push({sid:id,h:await H(p),used:false});out.push([s.no,s.n,s.k,p])}
+    save();log('Terbitkan '+out.length+' token');
+    $('#tk').innerHTML=`<div class="card"><h2>Token baru (tampil sekali)</h2><p>Simpan atau cetak sekarang. Sistem hanya menyimpan hash.</p><div class="tw"><table><tr><th>No</th><th>Nama</th><th>Kelas</th><th>Token</th></tr>${out.map(o=>`<tr><td>${esc(o[0])}</td><td>${esc(o[1])}</td><td>${esc(o[2])}</td><td class="tok"><b>${o[3]}</b></td></tr>`).join('')}</table></div>
+    <div class="row noprint" style="margin-top:.75rem"><button class="btn sm" onclick="print()">Cetak</button></div></div>`;
+    $('#tk').scrollIntoView();
+  }
+  return`<h1>Data Pemilih</h1><div id="tk"></div>
+  <div class="card"><h2>Tambah siswa</h2><div class="grid c3"><div><label>Nomor siswa</label><input id="no"></div><div><label>Nama</label><input id="nm"></div><div><label>Kelas</label><input id="kl"></div></div>
+  <div class="row" style="margin-top:1rem"><button class="btn" id="add">Tambah</button><label class="btn alt" style="margin:0;cursor:pointer">Impor CSV<input type="file" id="csv" accept=".csv,text/csv" hidden></label><button class="btn alt" id="all">Terbitkan semua token</button></div>
+  <small>Format CSV: nomor, nama, kelas (satu siswa per baris).</small></div>
+  <div class="card"><div class="grid c2"><input id="q" placeholder="Cari nama atau nomor"><select id="fk"><option value="">Semua kelas</option>${cls.map(k=>`<option>${esc(k)}</option>`).join('')}</select></div>
+  <div class="tw" style="margin-top:.75rem"><table><thead><tr><th>Nomor</th><th>Nama</th><th>Kelas</th><th>Hak pilih</th><th>Status</th><th>Aksi</th></tr></thead><tbody id="tb"></tbody></table></div></div>
+  <div class="card"><h2>Per kelas</h2>${cls.map(k=>{const a=D.st.filter(s=>s.k===k&&s.on),v=a.filter(s=>D.t.some(t=>t.sid===s.id&&t.used)).length;return`<div>${esc(k)}: ${v}/${a.length} sudah memilih</div>`}).join('')||'Belum ada data.'}</div>`;
+}
+function aCand(){
+  const lock=D.s.status==='berlangsung'||D.s.status==='selesai';
+  window.__after=()=>{
+    if(lock)return;
+    let photo='';
+    $('#ph').onchange=e=>{const x=e.target.files[0];if(!x)return;if(!/^image\/(png|jpeg|webp)$/.test(x.type)||x.size>250000){alert('Foto harus PNG/JPG/WEBP maksimal 250 KB.');e.target.value='';return}const r=new FileReader();r.onload=()=>{photo=r.result;$('#pp').src=photo};r.readAsDataURL(x)};
+    $('#sv').onclick=()=>{const g=i=>$('#'+i).value.trim();const nr=+g('nr');if(!nr||!g('kt')||!g('wk'))return alert('Nomor urut, nama ketua, dan nama wakil wajib diisi.');if(D.c.some(c=>c.nr===nr&&c.on!==false))return alert('Nomor urut sudah dipakai.');
+      D.c.push({id:D.seq++,nr,ketua:g('kt'),wakil:g('wk'),visi:g('vs'),misi:g('ms'),prog:g('pg'),photo,ord:+g('od')||nr,on:true});save();log('Tambah kandidat');render()};
+    document.querySelectorAll('[data-d]').forEach(b=>b.onclick=()=>{if(confirm('Hapus kandidat ini?')){D.c=D.c.filter(c=>c.id!=b.dataset.d);save();log('Hapus kandidat');render()}});
+  };
+  return`<h1>Kandidat</h1>${lock?'<div class="msg">Data kandidat terkunci karena pemilihan sudah dimulai.</div>':`<div class="card"><h2>Tambah kandidat</h2><div class="grid c2"><div><label>Nomor urut</label><input id="nr" type="number" min="1"></div><div><label>Urutan tampil</label><input id="od" type="number"></div>
+  <div><label>Nama calon ketua</label><input id="kt"></div><div><label>Nama calon wakil</label><input id="wk"></div></div>
+  <label>Foto pasangan</label><input type="file" id="ph" accept="image/*"><img id="pp" alt="" style="max-height:120px;margin-top:.5rem;border-radius:10px">
+  <label>Visi</label><textarea id="vs"></textarea><label>Misi</label><textarea id="ms"></textarea><label>Program kerja</label><textarea id="pg"></textarea>
+  <button class="btn" id="sv" style="margin-top:1rem">Simpan kandidat</button></div>`}
+  <div class="grid c2">${D.c.sort((a,b)=>a.ord-b.ord).map(c=>`<div class="card cand" style="margin:0"><span class="no">No. ${esc(c.nr)}</span><h3>${esc(c.ketua)} &amp; ${esc(c.wakil)}</h3><p><b>Visi:</b> ${esc(c.visi)}</p>${lock?'':`<button class="btn red sm" data-d="${c.id}" style="margin-top:.5rem">Hapus</button>`}</div>`).join('')||'<div class="card">Belum ada kandidat yang tersedia.</div>'}</div>`;
+}
+function aSet(){
+  window.__after=()=>{
+    const toL=v=>v?new Date(v).toISOString().slice(0,16):'';
+    $('#sv').onclick=()=>{D.s.start=$('#st').value?new Date($('#st').value).toISOString():'';D.s.end=$('#en').value?new Date($('#en').value).toISOString():'';D.s.period=$('#pr').value.trim();save();log('Ubah pengaturan pemilihan');render()};
+    const setS=(to,msg,min)=>{if(!confirm(msg))return;if(min&&!D.c.length)return alert('Tambahkan kandidat terlebih dahulu.');D.s.status=to;save();log('Status pemilihan: '+ST[to]);render()};
+    $('#op').onclick=()=>setS('berlangsung','Buka pemilihan? Data kandidat akan terkunci.',1);
+    $('#cl').onclick=()=>setS('selesai','Tutup pemilihan? Pemilih tidak bisa lagi memberikan suara.');
+    $('#rd').onclick=()=>setS('siap','Tandai pemilihan siap?',1);
+    $('#pw').onclick=async()=>{const u=$('#au').value.trim(),p=$('#ap').value;if(!u||p.length<6)return alert('Username wajib dan password minimal 6 karakter.');D.adm.u=u;D.adm.h=await H(p);save();log('Ubah kredensial admin');alert('Kredensial diperbarui.')};
+    $('#bk').onclick=()=>{log('Unduh cadangan data');const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(D)],{type:'application/json'}));a.download='cadangan-evote-osim-'+new Date().toISOString().slice(0,10)+'.json';a.click()};
+    $('#rf').onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{const x=JSON.parse(r.result);if(!x||!x.s||!Array.isArray(x.c)||!Array.isArray(x.st)||!Array.isArray(x.t)||!Array.isArray(x.b))throw 0;if(!confirm('Ganti semua data saat ini dengan isi cadangan?'))return;D=x;save();alert('Data dipulihkan.');location.hash='#/admin/dashboard';location.reload()}catch(_){alert('File cadangan tidak valid.')}};r.readAsText(f)};
+    $('#rs').onclick=()=>{if(confirm('Hapus SEMUA data demo (kandidat, pemilih, token, suara)?')){const s=D.s;localStorage.removeItem(KEY);D=null;location.reload()}};
+  };
+  const loc=v=>{if(!v)return'';const d=new Date(v);d.setMinutes(d.getMinutes()-d.getTimezoneOffset());return d.toISOString().slice(0,16)};
+  return`<h1>Pengaturan Pemilihan</h1><div class="card"><p>Status: <span class="tag">${ST[D.s.status]}</span> · Zona waktu: Asia/Jakarta</p>
+  <label>Periode</label><input id="pr" value="${esc(D.s.period)}"><div class="grid c2"><div><label>Mulai</label><input type="datetime-local" id="st" value="${loc(D.s.start)}"></div><div><label>Selesai</label><input type="datetime-local" id="en" value="${loc(D.s.end)}"></div></div>
+  <div class="row" style="margin-top:1rem"><button class="btn" id="sv">Simpan</button><button class="btn alt" id="rd">Tandai siap</button><button class="btn" id="op">Buka pemilihan</button><button class="btn red" id="cl">Tutup pemilihan</button></div>
+  <small>Catatan demo: jadwal memakai jam perangkat. Versi PHP memakai jam server.</small></div>
+  <div class="card"><h2>Akun admin</h2><div class="grid c2"><div><label>Username</label><input id="au" value="${esc(D.adm.u)}"></div><div><label>Password baru</label><input id="ap" type="password"></div></div><button class="btn" id="pw" style="margin-top:1rem">Perbarui akun</button></div>
+  <div class="card"><h2>Cadangan data</h2><p>Unduh cadangan sebelum, selama, dan sesudah pemilihan. Simpan filenya di tempat aman.</p><div class="row"><button class="btn" id="bk">Unduh cadangan</button><label class="btn alt" style="margin:0;cursor:pointer">Pulihkan dari file<input type="file" id="rf" accept=".json,application/json" hidden></label></div></div>
+  <div class="card"><h2>Reset demo</h2><button class="btn red" id="rs">Hapus semua data</button></div>`;
+}
+function aRes(){
+  if(D.s.status!=='selesai')return`<h1>Hasil</h1><div class="msg">Hasil baru bisa dilihat setelah pemilihan ditutup.</div>`;
+  const s=stats(),tot=D.b.length;
+  const rows=D.c.map(c=>({c,n:D.b.filter(b=>b.cid===c.id).length}));
+  const sum=rows.reduce((a,r)=>a+r.n,0);
+  window.__after=()=>{$('#ex').onclick=()=>{const csv='Nomor urut,Ketua,Wakil,Suara,Persen\n'+rows.map(r=>[r.c.nr,r.c.ketua,r.c.wakil,r.n,tot?(r.n/tot*100).toFixed(1):0].map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(',')).join('\n');const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));a.download='hasil-evote-osim.csv';a.click()}};
+  return`<h1>Hasil</h1><div class="grid s4"><div class="card stat" style="margin:0"><b>${tot}</b><span>Suara masuk</span></div><div class="card stat" style="margin:0"><b>${sum}</b><span>Suara sah</span></div><div class="card stat" style="margin:0"><b>${s.p}%</b><span>Partisipasi</span></div></div>
+  ${sum===tot?'':'<div class="msg">Peringatan: total suara kandidat tidak sama dengan suara masuk.</div>'}
+  <div class="card" style="margin-top:1rem">${rows.map(r=>{const p=tot?r.n/tot*100:0;return`<div><b>No. ${esc(r.c.nr)} ${esc(r.c.ketua)} &amp; ${esc(r.c.wakil)}</b> — ${r.n} suara (${p.toFixed(1)}%)<div class="bar"><i style="width:${p}%"></i></div></div>`}).join('')||'Belum ada kandidat.'}
+  <div class="row noprint"><button class="btn" id="ex">Ekspor CSV</button><button class="btn alt" onclick="print()">Ekspor PDF (cetak)</button></div></div>`;
+}
+function aAud(){return`<h1>Audit Aktivitas</h1><div class="card tw"><table><tr><th>Waktu</th><th>Aktivitas</th></tr>${D.a.map(a=>`<tr><td>${esc(a.w)}</td><td>${esc(a.x)}</td></tr>`).join('')||'<tr><td colspan="2">Belum ada aktivitas.</td></tr>'}</table></div>`}
+
+render();
+</script>
+</body>
+</html>
